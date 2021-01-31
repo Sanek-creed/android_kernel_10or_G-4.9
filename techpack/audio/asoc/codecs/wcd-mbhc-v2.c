@@ -29,6 +29,9 @@
 #include <sound/jack.h>
 #include "msm-cdc-pinctrl.h"
 #include "wcdcal-hwdep.h"
+
+#define SELFIE_IMPED 20000
+
 #include "wcd-mbhc-legacy.h"
 #include "wcd-mbhc-adc.h"
 #include "wcd-mbhc-v2-api.h"
@@ -307,7 +310,7 @@ out_micb_en:
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_PULLUP);
 		else
 			/* enable current source and disable mb, pullup*/
-			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
 
 		/* configure cap settings properly when micbias is disabled */
 		if (mbhc->mbhc_cb->set_cap_mode)
@@ -327,7 +330,7 @@ out_micb_en:
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
 		else
 			/* Disable micbias, pullup & enable cs */
-			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
 		mutex_unlock(&mbhc->hphl_pa_lock);
 		clear_bit(WCD_MBHC_ANC0_OFF_ACK, &mbhc->hph_anc_state);
 		break;
@@ -345,7 +348,7 @@ out_micb_en:
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
 		else
 			/* Disable micbias, pullup & enable cs */
-			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
 		mutex_unlock(&mbhc->hphr_pa_lock);
 		clear_bit(WCD_MBHC_ANC1_OFF_ACK, &mbhc->hph_anc_state);
 		break;
@@ -685,35 +688,24 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			mbhc->mbhc_cb->compute_impedance &&
 			(mbhc->mbhc_cfg->linein_th != 0) &&
 			(!is_pa_on)) {
-			/* Set MUX_CTL to AUTO for Z-det */
-			WCD_MBHC_REG_READ(WCD_MBHC_FSM_EN, fsm_en);
-			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 0);
-			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MUX_CTL,
-						 MUX_CTL_AUTO);
-			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 1);
-			mbhc->mbhc_cb->compute_impedance(mbhc,
-					&mbhc->zl, &mbhc->zr);
-			WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN,
-						 fsm_en);
-			if ((mbhc->zl > mbhc->mbhc_cfg->linein_th &&
-				mbhc->zl < MAX_IMPED) &&
-				(mbhc->zr > mbhc->mbhc_cfg->linein_th &&
-				 mbhc->zr < MAX_IMPED) &&
-				(jack_type == SND_JACK_HEADPHONE)) {
-				jack_type = SND_JACK_LINEOUT;
-				mbhc->force_linein = true;
-				mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
-				if (mbhc->hph_status) {
-					mbhc->hph_status &= ~(SND_JACK_HEADSET |
-							SND_JACK_LINEOUT |
+				mbhc->mbhc_cb->compute_impedance(mbhc,
+						&mbhc->zl, &mbhc->zr);
+				if ((jack_type == SND_JACK_UNSUPPORTED) &&
+				       mbhc->zl > SELFIE_IMPED &&
+				       mbhc->zr > SELFIE_IMPED) {
+					mbhc->current_plug = MBHC_PLUG_TYPE_HEADSET;
+					mbhc->jiffies_atreport = jiffies;
+					jack_type = SND_JACK_HEADSET;
+					if (mbhc->hph_status) {
+						mbhc->hph_status &= ~(SND_JACK_LINEOUT |
+							SND_JACK_HEADPHONE |
+							SND_JACK_ANC_HEADPHONE |
 							SND_JACK_UNSUPPORTED);
-					wcd_mbhc_jack_report(mbhc,
+							wcd_mbhc_jack_report(mbhc,
 							&mbhc->headset_jack,
 							mbhc->hph_status,
 							WCD_MBHC_JACK_MASK);
-				}
-				pr_debug("%s: Marking jack type as SND_JACK_LINEOUT\n",
-				__func__);
+					}
 			}
 		}
 
@@ -1120,7 +1112,7 @@ static irqreturn_t wcd_mbhc_btn_press_handler(int irq, void *data)
 		mbhc->mbhc_cb->lock_sleep(mbhc, false);
 	}
 done:
-	pr_debug("%s: leave\n", __func__);
+	pr_debug("%s: leave, button maks is %x\n", __func__, mask);
 	WCD_MBHC_RSC_UNLOCK(mbhc);
 	return IRQ_HANDLED;
 }

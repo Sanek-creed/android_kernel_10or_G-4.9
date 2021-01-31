@@ -16212,7 +16212,11 @@ static const struct snd_soc_dapm_widget msm_qdsp6_widgets[] = {
 		"Quaternary MI2S_RX Hostless Playback",
 		0, 0, 0, 0),
 	SND_SOC_DAPM_AIF_IN("QUIN_MI2S_DL_HL",
-		"Quinary MI2S_RX Hostless Playback",
+	    "Quinary MI2S_RX Hostless Playback",
+	    0, 0, 0, 0),
+	SND_SOC_DAPM_AIF_IN("QUIN_MI2S_DL_HL", "QUIN MI2S_RX Hostless Playback",
+		0, 0, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("QUIN_MI2S_UL_HL", "QUIN MI2S_TX Hostless Capture",
 		0, 0, 0, 0),
 
 	SND_SOC_DAPM_AIF_IN("AUXPCM_DL_HL", "AUXPCM_HOSTLESS Playback",
@@ -19596,6 +19600,7 @@ static const struct snd_soc_dapm_route intercon[] = {
 	{"PRI_MI2S_RX", NULL, "PRI_MI2S_DL_HL"},
 	{"TERT_MI2S_RX", NULL, "TERT_MI2S_DL_HL"},
 	{"QUAT_MI2S_UL_HL", NULL, "QUAT_MI2S_TX"},
+	{"QUIN_MI2S_UL_HL", NULL, "QUIN_MI2S_TX"},
 
 	{"PRI_TDM_TX_0_UL_HL", NULL, "PRI_TDM_TX_0"},
 	{"PRI_TDM_TX_1_UL_HL", NULL, "PRI_TDM_TX_1"},
