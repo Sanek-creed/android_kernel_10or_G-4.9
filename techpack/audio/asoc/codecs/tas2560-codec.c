@@ -42,7 +42,7 @@
 #include <sound/soc.h>
 #include <sound/initval.h>
 #include <sound/tlv.h>
-#include <linux/mfd/spk-id.h>
+#include <dsp/spk-id.h>
 
 #include "tas2560.h"
 #include "tas2560-core.h"

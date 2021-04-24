@@ -127,11 +127,12 @@ ifdef CONFIG_SND_SOC_WSA881X_ANALOG
 	WSA881X_ANALOG_OBJS += wsa881x-regmap-analog.o
 endif
  
-ifdef CONFIG_SND_SOC_TAS2560
+ifdef CONFIG_SND_SOC_TAS2560_STEREO
         TAS2560_OBJS += tas2560-core.o
         TAS2560_OBJS += tas2560-misc.o
         TAS2560_OBJS += tas2560-codec.o
         TAS2560_OBJS += tas2560-regmap.o
+	TAS2560_OBJS += spk-id.o
 endif 
  
 ifdef CONFIG_SND_SOC_MSM_STUB

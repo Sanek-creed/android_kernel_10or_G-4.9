@@ -24,6 +24,7 @@
 #include <dsp/q6audio-v2.h>
 #include <dsp/q6afe-v2.h>
 #include <dsp/q6core.h>
+#include <dsp/smart_amp.h>
 #include <dsp/audio_cal_utils.h>
 #include <ipc/apr.h>
 #include "adsp_err.h"
@@ -42,6 +43,10 @@
 #ifndef CONFIG_DOLBY_DAP
 #undef DOLBY_ADM_COPP_TOPOLOGY_ID
 #define DOLBY_ADM_COPP_TOPOLOGY_ID 0xFFFFFFFE
+#endif
+
+#ifdef SMART_AMP
+static struct afe_smartamp_get_calib *calib_resp;
 #endif
 
 #ifndef CONFIG_DOLBY_DS2
@@ -139,6 +144,39 @@ static struct adm_multi_ch_map port_channel_map[AFE_MAX_PORTS];
 static int adm_get_parameters[MAX_COPPS_PER_PORT * ADM_GET_PARAMETER_LENGTH];
 static int adm_module_topo_list[
 	MAX_COPPS_PER_PORT * ADM_GET_TOPO_MODULE_LIST_LENGTH];
+
+#ifdef SMART_AMP
+int32_t smartamp_get_set(uint32_t param_id, int32_t length, uint8_t get_set, u8 *user_data)
+{
+	int32_t  ret = 0;
+	switch (get_set) {
+	case TAS_SET_PARAM:
+		pr_debug("smartAmp: set param");
+		ret = afe_smartamp_set_calib_data(param_id , (struct afe_smartamp_set_params_t *)user_data, length);
+		break;
+	case TAS_GET_PARAM: {
+		if (calib_resp == NULL) {
+			calib_resp = kzalloc(sizeof(struct afe_smartamp_get_calib), GFP_KERNEL);
+			if (calib_resp == NULL) {
+				pr_err("smartAmp : No memory\n");
+				return -ENOMEM;
+			}
+		}
+		pr_debug("smartAmp: get param");
+
+		ret = afe_smartamp_get_calib_data(calib_resp, param_id, AFE_SMARTAMP_MODULE);
+		memcpy(user_data , calib_resp->res_cfg.payload , length);
+		}
+		break;
+	default:
+		goto fail_cmd;
+	}
+
+fail_cmd:
+	return ret;
+}
+#endif
+
 static struct mutex dts_srs_lock;
 
 void msm_dts_srs_acquire_lock(void)

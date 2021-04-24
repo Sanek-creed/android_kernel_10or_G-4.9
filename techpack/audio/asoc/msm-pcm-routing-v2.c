@@ -44,6 +44,9 @@
 #include "msm-qti-pp-config.h"
 #include "msm-dolby-dap-config.h"
 #include "msm-ds2-dap-config.h"
+/* SMART_AMP start */
+#include <dsp/smart_amp.h>
+/* SMART_AMP end */
 
 #ifndef CONFIG_DOLBY_DAP
 #undef DOLBY_ADM_COPP_TOPOLOGY_ID
@@ -263,6 +266,97 @@ static void msm_pcm_routing_deinit_pp(int port_id, int topology)
 		break;
 	}
 }
+
+/* SMART_AMP start */
+#define SMARTAMP_CONFIG_SPK_RE  0
+#define SMARTAMP_CONFIG_RCV_RE  1
+#define SMARTAMP_CONFIG_PROFILE 2
+#define SMARTAMP_CONFIG_BINIDX  3
+#define SMARTAMP_CONFIG         9
+
+/*
+ * Set profile
+ */
+#define AFE_SA_SET_PROFILE		3840
+#define AFE_SA_SET_SPK_RE		3848
+#define AFE_SA_SET_RCV_RE		3849
+#define AFE_SA_SET_BIN_IDX		3841
+
+static int smartamp_set_filter(struct snd_kcontrol *kcontrol,
+			       struct snd_ctl_elem_value *ucontrol)
+{
+	int32_t ret = 0;
+	int32_t pid = 0;
+
+	struct soc_mixer_control *mc = (struct soc_mixer_control *)kcontrol->private_value;
+
+	u8 buff[56];
+	u8 *ptr = buff;
+
+	((int32_t *)buff)[0] = ucontrol->value.integer.value[0];
+
+	pr_info("SmartAmp: %s %ld %ld\n", __func__, ucontrol->value.integer.value[0], ucontrol->value.integer.value[1]);
+	switch (mc->shift) {
+	case SMARTAMP_CONFIG_SPK_RE:
+		pid = AFE_SA_SET_SPK_RE;
+		break;
+	case SMARTAMP_CONFIG_RCV_RE:
+		pid = AFE_SA_SET_RCV_RE;
+		break;
+	case SMARTAMP_CONFIG_PROFILE:
+		pid = AFE_SA_SET_PROFILE;
+		break;
+	case SMARTAMP_CONFIG_BINIDX:
+		pid = AFE_SA_SET_BIN_IDX;
+		break;
+	default:
+		pr_info("SmartAmp: wrong %s prints\n", __func__);
+		break;
+	}
+	smartamp_get_set(pid, sizeof(buff), 0, ptr);
+	return ret;
+}
+
+static int smartamp_get_filter(struct snd_kcontrol *kcontrol,
+			       struct snd_ctl_elem_value *ucontrol)
+{
+	int32_t ret = 0;
+	struct soc_mixer_control *mc = (struct soc_mixer_control *)kcontrol->private_value;
+
+	pr_info("SmartAmp: %s", __func__);
+	switch (mc->shift) {
+	case SMARTAMP_CONFIG_SPK_RE:
+	case SMARTAMP_CONFIG_RCV_RE:
+	case SMARTAMP_CONFIG_PROFILE:
+		pr_info("SmartAmp: TODO: implement this\n");
+		break;
+	default:
+		pr_info("SmartAmp: wrong %s prints\n", __func__);
+		break;
+	}
+
+	return ret;
+}
+
+static const struct snd_kcontrol_new smartamp_filter_mixer_controls[] = {
+	SOC_SINGLE_EXT("SmartAmp Spk Re", SMARTAMP_CONFIG, SMARTAMP_CONFIG_SPK_RE, 1000000, 0, smartamp_get_filter, smartamp_set_filter),
+	SOC_SINGLE_EXT("SmartAmp Rcv Re", SMARTAMP_CONFIG, SMARTAMP_CONFIG_RCV_RE, 1000000, 0, smartamp_get_filter, smartamp_set_filter),
+	SOC_SINGLE_EXT("SmartAmp Profile", SMARTAMP_CONFIG, SMARTAMP_CONFIG_PROFILE, 1000000, 0, smartamp_get_filter, smartamp_set_filter),
+	SOC_SINGLE_EXT("SmartAmp SpkId", SMARTAMP_CONFIG, SMARTAMP_CONFIG_BINIDX, 1000000, 0, smartamp_get_filter, smartamp_set_filter)
+};
+
+int afe_smartamp_algo_ctrl(u8 *data, u32 param_id, u8 dir, u8 size, u8 slave_id)
+{
+	int32_t ret = 0;
+	pr_info("smartamp: @begin %s \n", __func__);
+
+	mutex_lock(&routing_lock);
+	ret = smartamp_get_set(param_id, size, dir, data);
+	pr_info("smartamp: get/set filter %d \n", dir);
+	mutex_unlock(&routing_lock);
+	return 0;
+}
+/* SMART_AMP end */
 
 static void msm_pcm_routng_cfg_matrix_map_pp(struct route_payload payload,
 					     int path_type, int perf_mode)
@@ -21177,6 +21271,10 @@ static int msm_routing_probe(struct snd_soc_platform *platform)
 	snd_soc_add_platform_controls(platform,
 			port_multi_channel_map_mixer_controls,
 			ARRAY_SIZE(port_multi_channel_map_mixer_controls));
+
+	/* SMART_AMP start */
+	snd_soc_add_platform_controls(platform, smartamp_filter_mixer_controls, ARRAY_SIZE(smartamp_filter_mixer_controls));
+	/*SMART_AMP end */
 
 	return 0;
 }
